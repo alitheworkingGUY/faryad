@@ -39,7 +39,7 @@ The database (`data/faryad.db`) is created and seeded automatically on first run
 | `OPENAI_TRANSCRIBE_LANGUAGE` | `ur` | Keeps Urdu in Urdu script. Leave empty to auto-detect |
 | `OPENAI_TTS_MODEL` | `gpt-4o-mini-tts` | Voice note on resolve |
 | `OPENAI_TTS_VOICE` | `coral` | Voice note voice |
-| `OPENAI_TEXT_MODEL` | `gpt-4o-mini` | Live field extraction and incident summaries |
+| `OPENAI_SUMMARY_MODEL` | `gpt-4o-mini` | Incident summaries and live field extraction |
 | `PUBLIC_BASE_URL` | none | Public https address used in QR codes. Optional: `npm run tunnel` sets it at runtime |
 
 Restart the server after changing `.env.local`.
@@ -51,6 +51,7 @@ Restart the server after changing `.env.local`.
 | `npm run dev` | Start the app on port 3000 in development mode |
 | `npm run demo` | Build and start the production server on port 3000. Use this on stage |
 | `npm run test:call` | End-to-end check of the call page with a stand-in for OpenAI (no credit used). Needs the app running; pass the tunnel URL as an argument to test through it |
+| `npm run test:real-call` | A real call to the agent with a scripted Urdu caller (synthesised speech fed in as the microphone). Uses OpenAI credit, roughly $0.05–0.15 per run. Good as a last check that the key, models and network all work |
 | `npm run seed` | Wipe tickets, calls and incidents and load the demo dataset (use Settings → Reset demo data while the app is running) |
 | `npm run tunnel` | Start `cloudflared` and tell the app its public URL, so QR codes work on phones |
 | `npm run tiles` | Cache the Peshawar map tiles locally (needs the app running). Do this once on good internet |
@@ -107,7 +108,8 @@ Command Center keys: **F** fullscreen · **M** heatmap · **R** show/hide resolv
 - **Voice**: the browser opens a WebRTC call straight to the OpenAI Realtime API using a short-lived client secret from `POST /api/realtime/session`. The agent's tools (`create_ticket`, `get_ticket_status`, `set_location_from_gps`, `transfer_to_human`) run in the browser against our REST API. Captions and usage are posted to `/api/calls/{id}/events` so the Command Center shows the call live. Speaking over the agent interrupts it (server VAD, 500 ms silence).
 - **Extracted details** on the Command Center come from the server: a keyword pass on each caller line, then a small text model, so the voice loop is never slowed.
 - **Business rules** (`src/server/`): department and SLA by category, priority from category + caller mood, incident clustering (3+ open tickets, same category and area, within 2 hours; escalation = min(3, floor(count / 3))).
-- **Voice note**: on resolve, OpenAI TTS writes an MP3 to `public/audio/`, served through `/api/audio/…`.
+- **Voice note**: OpenAI TTS writes an MP3 to `public/audio/`, served through `/api/audio/…`. Synthesis takes 4–6 seconds, so the note is prepared in the background when a ticket is created (or when an officer picks up a seeded one). On resolve it is already on disk and plays at once; if it is not ready, the citizen is told immediately and the audio follows.
+- **Weak networks**: server calls to OpenAI are retried, and a second attempt starts alongside a slow one. Each call is logged with its duration (`[faryad] openai … in … ms`) in the server output.
 - **Map**: MapLibre GL with OpenStreetMap raster tiles, darkened in the map style. Tiles go through `/api/tiles`, which caches them in `data/tiles/`.
 - **Cost meter**: `src/config/pricing.ts` holds the OpenAI prices, the USD → PKR rate and the "foreign platform" comparison. **The comparison figure and the exchange rate are assumptions**; set them to numbers you can defend before presenting.
 

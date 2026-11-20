@@ -49,6 +49,26 @@ type ServerEvent = {
 
 const OPENAI_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
+/** A minted secret is valid for about ten minutes; reuse one fetched up to this long ago. */
+const SESSION_FRESH_MS = 6 * 60 * 1000;
+
+/**
+ * Tells the agent, as a system note in the conversation, whether GPS was shared.
+ * Left to work it out for itself the model sometimes claimed to have a location it
+ * never received, so the fact is stated rather than left to a tool call.
+ */
+function gpsNote(g: Gps | null) {
+  const text = !g
+    ? "System note: the caller has NOT shared their GPS location. Do not say you have their location. Ask which area or mohalla the problem is in."
+    : g.inServiceArea === false
+      ? "System note: the caller shared GPS, but the phone is outside Peshawar, so it cannot be used. Do not say you have their location. Ask which area or mohalla the problem is in."
+      : `System note: the caller HAS shared their GPS location${g.nearestArea ? `; the nearest known area is ${g.nearestArea}` : ""}. Tell them once that their location was received and confirm ${g.nearestArea ? "that area" : "the area"} with them. The exact location is attached to the ticket automatically.`;
+  return {
+    type: "conversation.item.create",
+    item: { type: "message", role: "system", content: [{ type: "input_text", text }] },
+  };
+}
+
 /**
  * One voice call to the Faryad agent: microphone -> OpenAI Realtime over WebRTC.
  * Captions, tool calls and cost are mirrored to our server so the Command Center
@@ -75,6 +95,7 @@ export function useRealtimeCall(gps: Gps | null) {
   const dirtyRef = useRef<Set<string>>(new Set());
   const handledToolsRef = useRef<Set<string>>(new Set());
   const gpsRef = useRef<Gps | null>(gps);
+  const sessionRef = useRef<{ at: number; promise: Promise<SessionResponse> } | null>(null);
   const endedRef = useRef(false);
   const timersRef = useRef<{ tick?: ReturnType<typeof setInterval>; flush?: ReturnType<typeof setInterval> }>({});
   /** 0..1 loudness of whoever is talking; the orb reads it every frame without re-rendering. */
@@ -88,6 +109,8 @@ export function useRealtimeCall(gps: Gps | null) {
     const id = callIdRef.current;
     if (gps && id && !endedRef.current) {
       void api(`/api/calls/${id}/events`, { body: { type: "gps", lat: gps.lat, lng: gps.lng } }).catch(() => {});
+      const dc = dcRef.current;
+      if (dc && dc.readyState === "open") dc.send(JSON.stringify(gpsNote(gps)));
     }
   }, [gps]);
 
@@ -253,6 +276,10 @@ export function useRealtimeCall(gps: Gps | null) {
         case "output_audio_buffer.stopped":
         case "output_audio_buffer.cleared":
           setSpeaking((s) => (s === "agent" ? null : s));
+          break;
+        case "conversation.item.truncated":
+          // The caller spoke over the agent: what was said so far stands as the line.
+          if (e.item_id && linesRef.current.has(e.item_id)) upsertLine(e.item_id, "agent", { final: true });
           break;
         case "response.function_call_arguments.done":
           if (e.call_id && e.name) void runTool(e.call_id, e.name, e.arguments ?? "{}");
@@ -428,9 +455,16 @@ export function useRealtimeCall(gps: Gps | null) {
 
     try {
       // 2. Our call record + a short-lived OpenAI secret, in parallel.
+      // The secret may already be on its way (or here) from when the page opened.
+      const cached = sessionRef.current;
+      sessionRef.current = null; // a secret starts one call only
+      const sessionPromise =
+        cached && Date.now() - cached.at < SESSION_FRESH_MS
+          ? cached.promise.catch(() => api<SessionResponse>("/api/realtime/session", { method: "POST", body: {} }))
+          : api<SessionResponse>("/api/realtime/session", { method: "POST", body: {} });
       const [callRes, session] = await Promise.all([
         api<{ call: { id: string } }>("/api/calls", { method: "POST", body: {} }),
-        api<SessionResponse>("/api/realtime/session", { method: "POST", body: {} }),
+        sessionPromise,
       ]);
       callIdRef.current = callRes.call.id;
       startedAtRef.current = Date.now();
@@ -461,6 +495,7 @@ export function useRealtimeCall(gps: Gps | null) {
       dcRef.current = dc;
       dc.onopen = () => {
         if (session.sessionUpdate) send({ type: "session.update", session: session.sessionUpdate });
+        send(gpsNote(gpsRef.current));
         // The agent speaks first: the greeting.
         send({ type: "response.create" });
       };
@@ -474,11 +509,23 @@ export function useRealtimeCall(gps: Gps | null) {
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const sdpRes = await fetch(OPENAI_CALLS_URL, {
-        method: "POST",
-        body: offer.sdp,
-        headers: { Authorization: `Bearer ${session.clientSecret}`, "Content-Type": "application/sdp" },
-      });
+      // Hand the offer to OpenAI. A stalled connection is retried once rather than
+      // leaving the caller staring at "Connecting…".
+      let sdpRes: Response | null = null;
+      for (let attempt = 0; attempt < 2 && !sdpRes; attempt++) {
+        try {
+          sdpRes = await fetch(OPENAI_CALLS_URL, {
+            method: "POST",
+            body: offer.sdp,
+            headers: { Authorization: `Bearer ${session.clientSecret}`, "Content-Type": "application/sdp" },
+            signal: AbortSignal.timeout(9000),
+          });
+        } catch (err) {
+          if (attempt === 1) throw new ApiError("Cannot reach the voice service. Check the internet connection.", 0);
+          console.warn("[faryad] voice service did not answer, retrying:", (err as Error).message);
+        }
+      }
+      if (!sdpRes) throw new ApiError("Cannot reach the voice service. Check the internet connection.", 0);
       if (!sdpRes.ok) throw new ApiError(`The voice service refused the call (${sdpRes.status}).`, sdpRes.status);
       await pc.setRemoteDescription({ type: "answer", sdp: await sdpRes.text() });
 
@@ -500,6 +547,20 @@ export function useRealtimeCall(gps: Gps | null) {
       );
     }
   }, [end, fail, flush, onServerEvent, send, watchLevels]);
+
+  /**
+   * Fetches the session secret ahead of the tap, so "Start" only has to open the
+   * microphone and the WebRTC connection. Safe to call often; unused secrets just expire.
+   */
+  const prewarm = useCallback(() => {
+    const cached = sessionRef.current;
+    if (cached && Date.now() - cached.at < SESSION_FRESH_MS) return;
+    const promise = api<SessionResponse>("/api/realtime/session", { method: "POST", body: {} });
+    promise.catch(() => {
+      // reported when the call is actually started
+    });
+    sessionRef.current = { at: Date.now(), promise };
+  }, []);
 
   const toggleMute = useCallback(() => {
     setMuted((m) => {
@@ -540,7 +601,7 @@ export function useRealtimeCall(gps: Gps | null) {
   }, [teardown]);
 
   return {
-    call: { phase, problem, lines, speaking, ticket, seconds, muted, humanAlerted, start, end, reset, toggleMute },
+    call: { phase, problem, lines, speaking, ticket, seconds, muted, humanAlerted, start, end, reset, toggleMute, prewarm },
     /** Refs live outside `call` so render code can read call state freely. */
     levelRef,
     audioRef,

@@ -49,7 +49,8 @@ function useCallUrl(): { url: string; local: boolean } {
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
   const root = base || origin;
-  return { url: root ? `${root}/call` : "", local: !base && /localhost|127\.0\.0\.1/.test(origin) };
+  // A localhost address (from the browser or from PUBLIC_BASE_URL) is no use to a phone.
+  return { url: root ? `${root}/call` : "", local: /\/\/(localhost|127\.0\.0\.1)/.test(root) };
 }
 
 function Idle() {

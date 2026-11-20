@@ -15,7 +15,8 @@
     "tunnel": "node scripts/tunnel.mjs",
     "tiles": "node scripts/prewarm-tiles.mjs",
     "demo": "npm run build && npm run start",
-    "test:call": "node scripts/e2e-fake-call.mjs"
+    "test:call": "node scripts/e2e-fake-call.mjs",
+    "test:real-call": "node scripts/e2e-real-call.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

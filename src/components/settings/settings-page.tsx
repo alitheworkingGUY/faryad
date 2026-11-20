@@ -121,7 +121,7 @@ function Body() {
 
   const dirty = JSON.stringify(form) !== JSON.stringify(data.settings);
   const base = (form.publicBaseUrl || origin).replace(/\/+$/, "");
-  const usingLocalhost = !form.publicBaseUrl && /localhost|127\.0\.0\.1/.test(origin);
+  const usingLocalhost = /\/\/(localhost|127\.0\.0\.1)/.test(base);
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
 
   async function save() {

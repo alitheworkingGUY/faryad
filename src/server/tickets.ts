@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { db, getStore, schema } from "@/db";
 import type { TicketRow } from "@/db/schema";
@@ -20,7 +23,7 @@ import { broadcast } from "./bus";
 import { syncCallFromTicket } from "./calls";
 import { callDTO, refs, ticketDTO } from "./dto";
 import { clusterForTicket, closeIncidentIfDone } from "./incidents";
-import { synthesizeSpeech } from "./openai";
+import { hasOpenAIKey, synthesizeSpeech } from "./openai";
 import { clampMood, priorityFor, slaHoursFor } from "./rules";
 
 export class TicketError extends Error {
@@ -167,6 +170,8 @@ export function createTicket(input: CreateTicketInput): {
 
   const ticket = ticketDTO(row, r);
   broadcast({ type: "ticket.created", payload: ticket });
+  // Start the Urdu voice note now, so it is ready long before the ticket is resolved.
+  void prepareVoiceNote(row);
 
   const incident = clusterForTicket(row);
   const fresh = incident ? getRow(row.ticketNo) : row;
@@ -292,6 +297,8 @@ export function updateTicket(ticketNoRaw: string, patch: UpdateTicketInput): Tic
     void sendVoiceNote(row);
   } else if (set.status) {
     closeIncidentIfDone(row.incidentId);
+    // Seeded tickets have no note yet: prepare it as soon as an officer picks the ticket up.
+    if (set.status !== "open") void prepareVoiceNote(row);
   }
   return dto;
 }
@@ -323,23 +330,54 @@ export function voiceNoteText(name: string, ticketNo: string): string {
   return `محترم ${name}، آپ کی شکایت نمبر ${ticketNoSpokenUr(ticketNo)} حل کر دی گئی ہے۔ فریاد ہیلپ لائن استعمال کرنے کا شکریہ۔`;
 }
 
+const voiceJobs: Map<string, Promise<string | null>> = ((
+  globalThis as unknown as { __faryadVoiceJobs?: Map<string, Promise<string | null>> }
+).__faryadVoiceJobs ??= new Map());
+
+/**
+ * Makes sure the ticket's Urdu voice note exists on disk and returns its URL (null if
+ * text-to-speech is unavailable). Speech synthesis takes several seconds, so this is
+ * started in the background when a ticket is created or picked up; by the time the
+ * officer resolves it the file is ready and the citizen hears it straight away.
+ */
+export function prepareVoiceNote(ticket: Pick<TicketRow, "ticketNo" | "callerName">): Promise<string | null> {
+  if (!hasOpenAIKey()) return Promise.resolve(null);
+  // The file name depends on the caller's name, so a reset that reuses a ticket number
+  // can never play someone else's note.
+  const tag = createHash("sha1").update(ticket.callerName).digest("hex").slice(0, 8);
+  const file = `${ticket.ticketNo}-${tag}.mp3`;
+  const url = `/api/audio/${file}`;
+  if (fs.existsSync(path.join(process.cwd(), "public", "audio", file))) return Promise.resolve(url);
+
+  const running = voiceJobs.get(file);
+  if (running) return running;
+  const job = (async () => {
+    // A weak connection can lose the request; keep trying quietly in the background.
+    const waits = [0, 3000, 8000, 15_000];
+    for (let i = 0; i < waits.length; i++) {
+      if (waits[i]) await new Promise((r) => setTimeout(r, waits[i]));
+      try {
+        await synthesizeSpeech(voiceNoteText(ticket.callerName, ticket.ticketNo), file);
+        return url;
+      } catch (err) {
+        console.warn(
+          `[faryad] voice note for ${ticket.ticketNo}: try ${i + 1} of ${waits.length} failed:`,
+          (err as Error).message,
+        );
+      }
+    }
+    return null;
+  })().finally(() => voiceJobs.delete(file));
+  voiceJobs.set(file, job);
+  return job;
+}
+
 /**
  * Urdu voice note for the citizen. The citizen is told the ticket is resolved
  * either way; the audio is attached when text-to-speech succeeds.
  */
 async function sendVoiceNote(ticket: TicketRow): Promise<void> {
-  let audioUrl: string | null = null;
-  try {
-    const file = await synthesizeSpeech(
-      voiceNoteText(ticket.callerName, ticket.ticketNo),
-      `${ticket.ticketNo}-${Date.now()}.mp3`,
-    );
-    audioUrl = `/api/audio/${file}`;
-  } catch (err) {
-    console.warn(`[faryad] voice note for ${ticket.ticketNo} failed:`, (err as Error).message);
-  }
-
-  if (audioUrl) {
+  const attach = (audioUrl: string) => {
     const row = db()
       .update(schema.tickets)
       .set({ voiceNoteUrl: audioUrl })
@@ -348,6 +386,24 @@ async function sendVoiceNote(ticket: TicketRow): Promise<void> {
       .get();
     addEvent(ticket.id, "voice_note_sent", "Urdu voice note sent to the citizen.", "Faryad AI");
     if (row) broadcast({ type: "ticket.updated", payload: ticketDTO(row) });
+    broadcast({ type: "citizen.notify", payload: { ticketNo: ticket.ticketNo, audioUrl } });
+  };
+
+  // Usually already on disk (prepared when the ticket was created or picked up).
+  const job = prepareVoiceNote(ticket);
+  const ready = await Promise.race([job, new Promise<undefined>((r) => setTimeout(() => r(undefined), 2500))]);
+  if (ready) {
+    attach(ready);
+    return;
+  }
+
+  // Not ready yet: tell the citizen now, and send the audio the moment it exists.
+  broadcast({ type: "citizen.notify", payload: { ticketNo: ticket.ticketNo, audioUrl: null } });
+  const late = ready === undefined ? await job : null;
+  if (late) {
+    // The ticket may have been reopened while we waited.
+    const current = db().select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).get();
+    if (current?.status === "resolved") attach(late);
   } else {
     addEvent(
       ticket.id,
@@ -356,7 +412,6 @@ async function sendVoiceNote(ticket: TicketRow): Promise<void> {
       "Faryad AI",
     );
   }
-  broadcast({ type: "citizen.notify", payload: { ticketNo: ticket.ticketNo, audioUrl } });
 }
 
 /** Plain-language status for the voice agent (get_ticket_status tool). */

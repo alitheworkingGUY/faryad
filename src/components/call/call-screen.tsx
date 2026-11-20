@@ -123,7 +123,16 @@ export function CallScreen() {
   const [saved, setSaved] = useState<RegisteredTicket | null>(null);
   const [showStatus, setShowStatus] = useState(false);
   const { call, levelRef, audioRef } = useRealtimeCall(gps);
-  const { phase, ticket } = call;
+  const { phase, ticket, prewarm } = call;
+
+  // Get the voice session ready while the citizen is still reading the screen, and
+  // again after each call, so the next tap connects quickly.
+  useEffect(() => {
+    if (phase === "idle" || phase === "ended") prewarm();
+    if (phase !== "idle") return;
+    const id = setInterval(prewarm, 60_000);
+    return () => clearInterval(id);
+  }, [phase, prewarm]);
 
   // A ticket from an earlier visit: the citizen can come back to follow it.
   useEffect(() => {

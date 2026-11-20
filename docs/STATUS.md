@@ -12,13 +12,14 @@ Verified on this machine:
 - `npm run test:call` passes 18/18 against localhost (SSE) and through a Cloudflare quick tunnel (long-poll). It uses a stand-in WebRTC peer for OpenAI, so it covers our whole call flow but not OpenAI itself.
 - Command Center, Tickets, Incidents, Analytics, Settings, Officer and Call pages screenshotted at their target sizes with no console errors.
 
-NOT verified, because no `OPENAI_API_KEY` was available on this machine:
+Verified with the real OpenAI key (added to `.env.local` late on 20 Nov 2026):
 
-- A real Realtime call (session minting at `/v1/realtime/client_secrets`, the WebRTC handshake with OpenAI, Urdu speech quality, barge-in).
-- The Urdu voice note (`/v1/audio/speech`).
-- AI incident summaries and live field extraction by the text model (the keyword pass and the template summary were verified).
+- `npm run test:real-call`: a real Realtime call with a scripted Urdu caller passed 13/13. The agent greeted in Urdu, transcribed the caller, called `create_ticket` with the right fields, read the ticket number digit by digit, and stopped when spoken over. A 117 s call cost USD 0.114 (PKR 32); an 86 s call cost USD 0.042.
+- OpenAI accepted the full session config (no fallback needed). Event names and the usage shape match what the client code expects.
+- Urdu voice note: generated ahead of time, attached 26-280 ms after resolve, autoplays on the citizen page.
+- AI incident summary (English + Urdu) and live field extraction with `gpt-4.1`.
 
-First thing to do once the key is in `.env.local`: restart, open `/call`, make one call. If session minting returns HTTP 400, the server logs the reason and retries with a smaller session config (see `src/app/api/realtime/session/route.ts`).
+Still not done by anyone: a call from a physical phone through the tunnel (microphone permission prompt, speaker audio, real Urdu speech). Do this once before the demo.
 
 ## Decisions made
 
@@ -30,7 +31,11 @@ First thing to do once the key is in `.env.local`: restart, open `/call`, make o
 - Demo must run the production build (`npm run demo`). In dev mode the phone page took 164 s to become interactive through the tunnel on a slow uplink; in production 3-14 s.
 - Voice: browser <-> OpenAI Realtime over WebRTC with an ephemeral secret. Tools run in the browser against our REST API.
 - Live "extracted details" come from the server (keyword pass, then a small text model), so the voice loop is never slowed.
-- Voice notes are saved in `public/audio/` and served through `/api/audio/[file]`.
+- Voice notes are saved in `public/audio/` and served through `/api/audio/[file]`. They are prepared in the background on ticket creation / pickup (`prepareVoiceNote` in `src/server/tickets.ts`), because synthesis takes 4-6 s.
+- The agent is told the GPS status by a system note at call start. Left to call `set_location_from_gps` itself it skipped the tool and claimed a location it never had.
+- The session secret is fetched when `/call` opens (`prewarm`), so the tap only opens the mic and WebRTC.
+- Server calls to OpenAI go through `resilientPost` (`src/server/openai.ts`): per-try timeout, retries, and a parallel second try when the first is slow. This network dropped new connections to OpenAI intermittently (10 s connect timeouts).
+- `OPENAI_SUMMARY_MODEL` (the user's name for it) selects the text model; `OPENAI_TEXT_MODEL` still works.
 - Map: OpenStreetMap raster tiles darkened in the MapLibre style (CARTO's dark tiles now need an API key). Tiles go through the caching proxy `/api/tiles` into `data/tiles/` (978 tiles for zoom 9-15 are cached on this machine).
 - MapLibre v6 worker is copied to `public/maplibre/` by `scripts/copy-map-worker.mjs` (runs before dev and build).
 - Urdu font: the stack uses the real Inter and Noto Nastaliq Urdu faces only. next/font's "Inter Fallback" is local Arial, which has Arabic glyphs and was hijacking Urdu text.
@@ -42,4 +47,5 @@ First thing to do once the key is in `.env.local`: restart, open `/call`, make o
 
 - Turbopack sometimes missed a rewrite of `globals.css` on Windows; touching the file again fixed it.
 - Headless Chrome's `--virtual-time-budget` hangs on pages with an open SSE connection; use `scripts/shot.mjs` (Playwright, installed Chrome).
-- Node's own `fetch` to `*.trycloudflare.com` timed out connecting on this network while curl and Chrome worked.
+- Node's own `fetch` to `*.trycloudflare.com` and to `api.openai.com` intermittently timed out connecting on this network while curl and Chrome worked.
+- On this network, tap-to-live took 9-11 s (session + SDP exchange with OpenAI). Expect 1-3 s on a healthy connection.
