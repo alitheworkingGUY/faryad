@@ -45,7 +45,7 @@ export default function MiniMapInner({
         ref={ref}
         mapStyle={MAP_STYLE}
         initialViewState={{ longitude: lng, latitude: lat, zoom }}
-        attributionControl={{ compact: true }}
+        attributionControl={false}
         dragRotate={false}
         touchPitch={false}
         interactive={interactive}
@@ -76,6 +76,9 @@ export default function MiniMapInner({
           </Marker>
         )}
       </Map>
+      <span className="pointer-events-none absolute start-2 bottom-1.5 rounded bg-ink/70 px-1.5 text-[10px] leading-4 text-dim">
+        © OpenStreetMap contributors
+      </span>
     </div>
   );
 }
