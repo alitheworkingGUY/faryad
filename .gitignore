@@ -54,3 +54,6 @@ next-env.d.ts
 
 # cached map tiles
 /data/tiles/
+
+# local binaries (cloudflared)
+/tools/

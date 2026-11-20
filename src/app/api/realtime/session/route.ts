@@ -27,9 +27,15 @@ export async function POST() {
     } catch (err) {
       if (!(err instanceof OpenAIError) || err.status !== 400) throw err;
       console.warn("[faryad] full realtime session config refused:", err.message);
-      const { audio, output_modalities: _modalities, ...essentials } = session;
-      secret = await mintRealtimeSecret({ ...essentials, audio: { output: audio.output } });
-      sessionUpdate = { type: "realtime", audio: { input: audio.input } };
+      secret = await mintRealtimeSecret({
+        type: session.type,
+        model: session.model,
+        instructions: session.instructions,
+        tools: session.tools,
+        tool_choice: session.tool_choice,
+        audio: { output: session.audio.output },
+      });
+      sessionUpdate = { type: "realtime", audio: { input: session.audio.input } };
     }
     return json({
       clientSecret: secret.value,

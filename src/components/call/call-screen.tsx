@@ -122,7 +122,7 @@ export function CallScreen() {
   const [locating, setLocating] = useState(false);
   const [saved, setSaved] = useState<RegisteredTicket | null>(null);
   const [showStatus, setShowStatus] = useState(false);
-  const call = useRealtimeCall(gps);
+  const { call, levelRef, audioRef } = useRealtimeCall(gps);
   const { phase, ticket } = call;
 
   // A ticket from an earlier visit: the citizen can come back to follow it.
@@ -211,7 +211,7 @@ export function CallScreen() {
 
   return (
     <div dir="rtl" lang="ur" className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-ink px-5 pt-5 pb-7">
-      <audio ref={call.audioRef} autoPlay playsInline className="hidden" />
+      <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
       <header className="flex items-center justify-between" dir="ltr">
         <Logo size="sm" />
@@ -310,7 +310,7 @@ export function CallScreen() {
                 <TicketCard ticket={ticket} compact />
               </div>
             ) : (
-              <Orb levelRef={call.levelRef} speaking={call.speaking} active={live} className="mt-2" />
+              <Orb levelRef={levelRef} speaking={call.speaking} active={live} className="mt-2" />
             )}
 
             <p className="ur ur-tight mt-1 h-8 text-center text-lg text-dim">

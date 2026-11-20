@@ -8,7 +8,7 @@ import { EmptyState, LoadingState } from "@/components/shared/states";
 import { SmartText } from "@/components/shared/transcript";
 import { useNow } from "@/hooks/use-now";
 import type { TicketDTO } from "@/lib/domain";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, timeAgoUr } from "@/lib/format";
 import { Bi, useLang } from "@/lib/i18n";
 import { useLive } from "@/lib/store";
 import { useUI } from "@/lib/ui-store";
@@ -59,7 +59,7 @@ function Row({ ticket, fresh, now }: { ticket: TicketDTO; fresh: boolean; now: n
           </div>
           <div className="flex items-center gap-2 text-[11px] text-dim">
             <StatusBadge status={ticket.status} className="h-5 px-2 text-[11px]" />
-            <span className="tnum">{timeAgo(ticket.createdAt, now)}</span>
+            <span className="tnum">{isUr ? timeAgoUr(ticket.createdAt, now) : timeAgo(ticket.createdAt, now)}</span>
           </div>
         </div>
       </button>

@@ -3,12 +3,18 @@
 // Run it in a second terminal while `npm run dev` is running.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const port = process.env.PORT || "3000";
 const local = `http://localhost:${port}`;
 
+const here = dirname(fileURLToPath(import.meta.url));
 const candidates = [
   "cloudflared",
+  // a copy kept next to the project (tools/ is git-ignored)
+  join(here, "..", "tools", "cloudflared.exe"),
+  join(here, "..", "tools", "cloudflared"),
   "C:\Program Files (x86)\cloudflared\cloudflared.exe",
   "C:\Program Files\cloudflared\cloudflared.exe",
 ];

@@ -145,6 +145,7 @@ function useLiveAlerts() {
           toast.error("Human officer needed · انسانی افسر درکار ہے", {
             description: `${event.payload.phoneMasked ?? "Caller"} — ${event.payload.reason}`,
             duration: 14_000,
+            position: "bottom-center",
             className: "!border-danger/60 !bg-[#2a0f14]",
           });
         } else if (event.type === "incident.created") {
@@ -152,6 +153,7 @@ function useLiveAlerts() {
           toast.warning(`Incident detected · ${CATEGORY_META[i.category].en} · ${i.areaEn}`, {
             description: i.summary,
             duration: 12_000,
+            position: "bottom-center",
             className: "!border-danger/60 !bg-[#2a0f14]",
             action: { label: "View", onClick: () => router.push(`/incidents?focus=${i.id}`) },
           });

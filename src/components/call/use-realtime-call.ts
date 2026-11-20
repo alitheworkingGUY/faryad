@@ -540,19 +540,9 @@ export function useRealtimeCall(gps: Gps | null) {
   }, [teardown]);
 
   return {
-    phase,
-    problem,
-    lines,
-    speaking,
-    ticket,
-    seconds,
-    muted,
-    humanAlerted,
+    call: { phase, problem, lines, speaking, ticket, seconds, muted, humanAlerted, start, end, reset, toggleMute },
+    /** Refs live outside `call` so render code can read call state freely. */
     levelRef,
     audioRef,
-    start,
-    end,
-    reset,
-    toggleMute,
   };
 }

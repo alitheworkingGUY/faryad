@@ -26,8 +26,6 @@ type Props = {
   onIncidentClick?: (incident: IncidentDTO) => void;
 };
 
-const FRESH_MS = 8000;
-
 const Pin = memo(function Pin({
   ticket,
   fresh,
@@ -233,7 +231,7 @@ export default function CityMap({
 
         {ordered.map((t) => {
           const arrived = fresh[t.ticketNo];
-          const isFresh = Boolean(arrived && arrived >= mountedAt && Date.now() - arrived < FRESH_MS);
+          const isFresh = Boolean(arrived && arrived >= mountedAt);
           return (
             <Marker
               key={t.ticketNo}

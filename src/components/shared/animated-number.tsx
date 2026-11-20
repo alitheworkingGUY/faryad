@@ -16,7 +16,9 @@ export function AnimatedNumber({
   const ref = useRef<HTMLSpanElement>(null);
   const previous = useRef(0);
   const formatRef = useRef(format);
-  formatRef.current = format;
+  useEffect(() => {
+    formatRef.current = format;
+  }, [format]);
 
   useEffect(() => {
     const node = ref.current;

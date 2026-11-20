@@ -143,7 +143,7 @@ export function MapPanel({
       </div>
 
       {/* Footer legend */}
-      <div className="pointer-events-none absolute start-4 bottom-4 flex items-center gap-3 rounded-lg border border-line bg-ink/85 px-3 py-2 text-xs text-dim backdrop-blur">
+      <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-3 rounded-lg border border-line bg-ink/85 px-3 py-2 text-xs text-dim backdrop-blur">
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-live" />
           <span className="font-semibold text-fg tnum">{loaded ? visible.length : "—"}</span>
