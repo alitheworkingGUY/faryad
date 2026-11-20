@@ -7,10 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter-face), var(--font-nastaliq), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-latin), var(--font-nq), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-heading: var(--font-inter-face), var(--font-nastaliq), ui-sans-serif, system-ui, sans-serif;
-  --font-urdu: var(--font-inter-face), var(--font-nastaliq), "Noto Nastaliq Urdu", serif;
+  --font-heading: var(--font-latin), var(--font-nq), ui-sans-serif, system-ui, sans-serif;
+  --font-urdu: var(--font-latin), var(--font-nq), "Noto Nastaliq Urdu", serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -128,7 +128,7 @@
 /* Urdu text: Nastaliq needs generous line height and its own direction. */
 .ur {
   /* Latin and digits stay in Inter; Arabic-script glyphs fall through to Nastaliq */
-  font-family: var(--font-inter-face), var(--font-nastaliq), "Noto Nastaliq Urdu", serif;
+  font-family: var(--font-latin), var(--font-nq), "Noto Nastaliq Urdu", serif;
   line-height: 1.9;
   direction: rtl;
   unicode-bidi: isolate;
@@ -275,3 +275,4 @@ html[lang="ur"] body {
     animation: none;
   }
 }
+

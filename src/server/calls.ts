@@ -12,7 +12,7 @@ import {
 } from "@/lib/domain";
 import { digitsOnly } from "@/lib/format";
 import { transcriptionCostUsd, usdToPkr } from "@/config/pricing";
-import { listAreas, matchArea } from "./areas";
+import { isInPeshawar, listAreas, matchArea, nearestArea } from "./areas";
 import { broadcast } from "./bus";
 import { callDTO } from "./dto";
 import { chatJson } from "./openai";
@@ -88,13 +88,16 @@ export function activeCalls(): CallDTO[] {
 }
 
 export type CallEventInput =
-  | { type: "transcript"; id?: string; role: "caller" | "agent"; text: string; final?: boolean }
+  | { type: "transcript"; id?: string; role: "caller" | "agent"; text: string; final?: boolean; ts?: number }
   | { type: "fields"; fields: CallFields }
   | { type: "metrics"; seconds?: number; costUsd?: number }
   | { type: "gps"; lat: number; lng: number }
   | { type: "human_needed"; reason?: string };
 
-export function addCallEvent(id: string, event: CallEventInput): { ok: true } {
+export function addCallEvent(
+  id: string,
+  event: CallEventInput,
+): { ok: true; nearestArea?: string | null; inServiceArea?: boolean } {
   const row = getRow(id);
   if (!row) throw new CallError("Call not found", 404);
   const d = db();
@@ -105,11 +108,16 @@ export function addCallEvent(id: string, event: CallEventInput): { ok: true } {
       if (!text) return { ok: true };
       if (event.role !== "caller" && event.role !== "agent") throw new CallError("Unknown role");
       const final = event.final !== false;
+      // The caller's words are transcribed a moment after the agent has already begun
+      // answering, so the browser sends when each line started and we order by that.
+      const now = Date.now();
+      const sent = Number(event.ts);
+      const ts = Number.isFinite(sent) && sent > row.startedAt - 5000 && sent <= now + 5000 ? sent : now;
       const line: TranscriptLine = {
         id: event.id || randomUUID(),
         role: event.role,
         text,
-        ts: Date.now(),
+        ts,
         final,
       };
       if (final) {
@@ -117,6 +125,7 @@ export function addCallEvent(id: string, event: CallEventInput): { ok: true } {
         const at = transcript.findIndex((l) => l.id === line.id);
         if (at >= 0) transcript[at] = { ...line, ts: transcript[at].ts };
         else transcript.push(line);
+        transcript.sort((a, b) => a.ts - b.ts);
         d.update(schema.calls).set({ transcript }).where(eq(schema.calls.id, id)).run();
       }
       broadcast({ type: "call.transcript", payload: { callId: id, line } });
@@ -140,7 +149,8 @@ export function addCallEvent(id: string, event: CallEventInput): { ok: true } {
       const lng = Number(event.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new CallError("Invalid coordinates");
       d.update(schema.calls).set({ lat, lng }).where(eq(schema.calls.id, id)).run();
-      return { ok: true };
+      const inServiceArea = isInPeshawar(lat, lng);
+      return { ok: true, inServiceArea, nearestArea: inServiceArea ? (nearestArea(lat, lng)?.nameEn ?? null) : null };
     }
     case "human_needed": {
       const reason = String(event.reason ?? "Caller asked for a human officer").slice(0, 200);

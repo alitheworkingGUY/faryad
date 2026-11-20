@@ -66,7 +66,7 @@ function upsertLine(lines: TranscriptLine[], line: TranscriptLine): TranscriptLi
     next[at] = { ...line, ts: lines[at].ts };
     return next;
   }
-  return [...lines, line];
+  return [...lines, line].sort((a, b) => a.ts - b.ts);
 }
 
 export const useLive = create<LiveState>((set, get) => ({
