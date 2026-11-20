@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-map-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-map-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "demo:call": "tsx scripts/simulate-call.ts"
+    "demo:call": "tsx scripts/simulate-call.ts",
+    "tunnel": "node scripts/tunnel.mjs",
+    "tiles": "node scripts/prewarm-tiles.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -42,6 +46,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "playwright-core": "^1.65.1",
     "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5"

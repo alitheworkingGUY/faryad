@@ -1,3 +1,4 @@
+import { broadcast } from "@/server/bus";
 import { fail, json, readJson } from "@/server/http";
 import { hasOpenAIKey, openaiConfig } from "@/server/openai";
 import {
@@ -21,7 +22,8 @@ function payload() {
     defaults: { greeting: DEFAULT_GREETING, systemPrompt: DEFAULT_SYSTEM_PROMPT },
     voices: REALTIME_VOICES,
     resolvedPrompt: buildInstructions(settings),
-    publicBaseUrl: process.env.PUBLIC_BASE_URL?.trim().replace(/\/+$/, "") || null,
+    publicBaseUrl: settings.publicBaseUrl || null,
+    envPublicBaseUrl: process.env.PUBLIC_BASE_URL?.trim() || null,
     aiReady: hasOpenAIKey(),
     models: {
       realtime: cfg.realtimeModel,
@@ -46,7 +48,10 @@ export async function PUT(req: Request) {
     const body = await readJson<Partial<AgentSettings> & { reset?: boolean }>(req);
     if (body.reset) resetSettings();
     else saveSettings(body);
-    return json(payload());
+    const result = payload();
+    // QR codes on every open screen follow the new address straight away.
+    broadcast({ type: "settings.updated", payload: { publicBaseUrl: result.publicBaseUrl } });
+    return json(result);
   } catch (err) {
     return fail(err);
   }

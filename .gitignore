@@ -48,3 +48,9 @@ next-env.d.ts
 /data/*.db-*
 /public/audio/*
 !/public/audio/.gitkeep
+
+# generated: MapLibre worker copied from node_modules
+/public/maplibre/
+
+# cached map tiles
+/data/tiles/

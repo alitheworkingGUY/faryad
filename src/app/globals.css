@@ -235,3 +235,43 @@ html[lang="ur"] body {
     animation: none;
   }
 }
+
+/* Pin-drop ripple: three rings, then gone */
+.ripple-once {
+  animation: faryad-pulse-ring 1.1s cubic-bezier(0.2, 0.6, 0.35, 1) 3 forwards;
+  opacity: 0;
+}
+
+@keyframes faryad-wave {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.wave-bar {
+  transform-origin: center;
+  animation: faryad-wave 0.9s ease-in-out infinite;
+}
+
+@keyframes faryad-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.radar-sweep {
+  animation: faryad-sweep 4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ripple-once,
+  .wave-bar,
+  .radar-sweep {
+    animation: none;
+  }
+}

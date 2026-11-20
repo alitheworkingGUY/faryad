@@ -82,37 +82,40 @@ export function simulateCall(scenarioKey?: string, speed = 1): { callId: string;
   const callId = call.id;
   const started = Date.now();
   const pause = (ms: number) => sleep(ms / speed);
-  const tick = (costUsd: number) =>
+  // Roughly what a real Realtime call costs per second of conversation.
+  const USD_PER_SECOND = 0.0011;
+  const elapsed = () => Math.round(((Date.now() - started) / 1000) * speed);
+  const tick = () =>
     addCallEvent(callId, {
       type: "metrics",
       seconds: Math.round((Date.now() - started) / 1000),
-      costUsd,
+      costUsd: elapsed() * USD_PER_SECOND,
     });
 
   void (async () => {
     try {
       await pause(900);
       await say(callId, "agent", "السلام علیکم، فریاد ہیلپ لائن، میں آپ کی کیا مدد کر سکتی ہوں؟", speed);
-      tick(0.012);
+      tick();
       await pause(700);
       await say(callId, "caller", s.problemUr, speed);
       addCallEvent(callId, {
         type: "fields",
         fields: { category: s.category, description: s.descriptionEn, mood: s.mood },
       });
-      tick(0.031);
+      tick();
       await pause(600);
       await say(callId, "agent", "مجھے افسوس ہے کہ آپ کو یہ تکلیف ہو رہی ہے۔ یہ مسئلہ کس علاقے میں ہے؟", speed);
       await pause(600);
       await say(callId, "caller", `${s.areaUr} میں۔`, speed);
       addCallEvent(callId, { type: "fields", fields: { area: s.area } });
-      tick(0.052);
+      tick();
       await pause(500);
       await say(callId, "agent", "شکریہ۔ براہِ کرم اپنا نام اور فون نمبر بتا دیں۔", speed);
       await pause(600);
       await say(callId, "caller", `میرا نام ${s.name} ہے، اور نمبر ہے ${s.phone}۔`, speed);
       addCallEvent(callId, { type: "fields", fields: { name: s.name, phone: s.phone } });
-      tick(0.078);
+      tick();
       await pause(500);
       await say(
         callId,
@@ -134,7 +137,7 @@ export function simulateCall(scenarioKey?: string, speed = 1): { callId: string;
         mood: s.mood,
         callId,
       });
-      tick(0.104);
+      tick();
       await pause(900);
       await say(
         callId,
@@ -146,13 +149,13 @@ export function simulateCall(scenarioKey?: string, speed = 1): { callId: string;
       await say(callId, "caller", "نہیں، بہت شکریہ۔", speed);
       await pause(400);
       await say(callId, "agent", "فریاد ہیلپ لائن پر کال کرنے کا شکریہ۔ اللہ حافظ۔", speed);
-      tick(0.131);
+      tick();
       await pause(1200);
     } catch (err) {
       console.error("[faryad] simulated call failed:", err);
     } finally {
       try {
-        endCall(callId, { seconds: Math.round((Date.now() - started) / 1000), costUsd: 0.131 });
+        endCall(callId, { seconds: Math.round((Date.now() - started) / 1000), costUsd: elapsed() * USD_PER_SECOND });
       } catch {
         // the call may already be gone after a demo reset
       }

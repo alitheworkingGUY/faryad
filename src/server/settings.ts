@@ -20,6 +20,8 @@ export type AgentSettings = {
   greeting: string;
   voice: string;
   systemPrompt: string;
+  /** Public https address of this app (the tunnel URL). Used in every QR code. */
+  publicBaseUrl: string;
 };
 
 export const DEFAULT_GREETING = "السلام علیکم، فریاد ہیلپ لائن، میں آپ کی کیا مدد کر سکتی ہوں؟";
@@ -51,7 +53,18 @@ const DEFAULTS = (): AgentSettings => ({
   greeting: DEFAULT_GREETING,
   voice: openaiConfig().realtimeVoice,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  publicBaseUrl: cleanUrl(process.env.PUBLIC_BASE_URL),
 });
+
+function cleanUrl(value: string | undefined | null): string {
+  const v = (value ?? "").trim().replace(/\/+$/, "");
+  return /^https?:\/\/[^\s]+$/i.test(v) ? v : "";
+}
+
+/** Saved in Settings (or by `npm run tunnel`); falls back to PUBLIC_BASE_URL from the environment. */
+export function getPublicBaseUrl(): string | null {
+  return getSettings().publicBaseUrl || null;
+}
 
 export function getSettings(): AgentSettings {
   const rows = db().select().from(schema.settings).all();
@@ -62,14 +75,16 @@ export function getSettings(): AgentSettings {
     greeting: stored.greeting?.trim() || base.greeting,
     voice: (REALTIME_VOICES as readonly string[]).includes(stored.voice) ? stored.voice : base.voice,
     systemPrompt: stored.systemPrompt?.trim() || base.systemPrompt,
+    publicBaseUrl: stored.publicBaseUrl !== undefined ? cleanUrl(stored.publicBaseUrl) : base.publicBaseUrl,
   };
 }
 
 export function saveSettings(patch: Partial<AgentSettings>): AgentSettings {
   const d = db();
-  for (const key of ["agentName", "greeting", "voice", "systemPrompt"] as const) {
-    const value = patch[key];
+  for (const key of ["agentName", "greeting", "voice", "systemPrompt", "publicBaseUrl"] as const) {
+    let value = patch[key];
     if (typeof value !== "string") continue;
+    if (key === "publicBaseUrl") value = cleanUrl(value);
     d.insert(schema.settings)
       .values({ key, value })
       .onConflictDoUpdate({ target: schema.settings.key, set: { value } })

@@ -85,8 +85,9 @@ export const SEED_TICKETS: {
   note?: string;
 }[] = [
   // Two open "no water" reports in Gulbahar: the third, made live on stage, raises an incident.
-  { area: "Gulbahar", category: "water", status: "open", minutesAgo: 48, name: "Gul Zaman", phone: "03335550148", mood: 2, ur: "گلبہار گلی نمبر ۴ میں صبح سے پانی نہیں آ رہا۔", en: "No water supply in Gulbahar Street 4 since morning." },
-  { area: "Gulbahar", category: "water", status: "assigned", minutesAgo: 22, name: "Rukhsana Begum", phone: "03005550122", mood: 3, ur: "گلبہار نمبر ۲ میں پانی کی سپلائی بند ہے، ٹیوب ویل خراب لگتا ہے۔", en: "Water supply is off in Gulbahar No. 2; the tube well seems to be faulty." },
+  // They are seeded minutes old so the 2-hour clustering window stays open for ~1h45m after a reset.
+  { area: "Gulbahar", category: "water", status: "open", minutesAgo: 14, name: "Gul Zaman", phone: "03335550148", mood: 2, ur: "گلبہار گلی نمبر ۴ میں صبح سے پانی نہیں آ رہا۔", en: "No water supply in Gulbahar Street 4 since morning." },
+  { area: "Gulbahar", category: "water", status: "assigned", minutesAgo: 5, name: "Rukhsana Begum", phone: "03005550122", mood: 3, ur: "گلبہار نمبر ۲ میں پانی کی سپلائی بند ہے، ٹیوب ویل خراب لگتا ہے۔", en: "Water supply is off in Gulbahar No. 2; the tube well seems to be faulty." },
 
   { area: "Hashtnagri", category: "electricity", status: "open", minutesAgo: 35, name: "Bilal Khattak", phone: "03455550135", mood: 1, ur: "ہشتنگری میں بجلی کا تار ٹوٹ کر گلی میں گرا ہوا ہے، بچے قریب کھیل رہے ہیں۔", en: "A live electricity wire has snapped and fallen in the street in Hashtnagri; children are playing nearby." },
   { area: "Tehkal", category: "streetlight", status: "open", minutesAgo: 28, name: "Hina Qureshi", phone: "03125550128", mood: 4, ur: "تہکال پایاں کی مرکزی گلی میں سٹریٹ لائٹس بند ہیں۔", en: "Streetlights are off on the main street of Tehkal Payan." },

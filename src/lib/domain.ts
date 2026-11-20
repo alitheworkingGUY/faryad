@@ -236,6 +236,7 @@ export type LiveEvent =
   | { type: "incident.created"; payload: IncidentDTO }
   | { type: "incident.updated"; payload: IncidentDTO }
   | { type: "citizen.notify"; payload: { ticketNo: string; audioUrl: string | null } }
+  | { type: "settings.updated"; payload: { publicBaseUrl: string | null } }
   | { type: "demo.reset"; payload: Record<string, never> };
 
 export type LiveEventType = LiveEvent["type"];

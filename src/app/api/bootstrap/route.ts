@@ -4,6 +4,7 @@ import { departmentDTO, refs } from "@/server/dto";
 import { fail, json } from "@/server/http";
 import { listIncidents } from "@/server/incidents";
 import { hasOpenAIKey } from "@/server/openai";
+import { getPublicBaseUrl } from "@/server/settings";
 import { getStats } from "@/server/stats";
 import { listTickets } from "@/server/tickets";
 
@@ -19,7 +20,7 @@ export async function GET() {
       departments: [...refs().depts.values()].map(departmentDTO),
       stats: getStats(),
       activeCalls: activeCalls(),
-      publicBaseUrl: process.env.PUBLIC_BASE_URL?.trim().replace(/\/+$/, "") || null,
+      publicBaseUrl: getPublicBaseUrl(),
       aiReady: hasOpenAIKey(),
       serverTime: Date.now(),
     });
