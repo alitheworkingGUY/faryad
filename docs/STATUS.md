@@ -2,33 +2,44 @@
 
 Resume point if a session is interrupted. Spec: the build brief pasted on 20 Nov 2026 (milestones 1-7).
 
+## State on 20 Nov 2026 (evening)
+
+All seven milestones are built. Repo: https://github.com/alitheworkingGUY/faryad (private), branch `main`.
+
+Verified on this machine:
+
+- `npx tsc --noEmit` clean, ESLint 0 errors (12 warnings, all `react-hooks/set-state-in-effect`, explained in `eslint.config.mjs`), `npm run build` succeeds.
+- `npm run test:call` passes 18/18 against localhost (SSE) and through a Cloudflare quick tunnel (long-poll). It uses a stand-in WebRTC peer for OpenAI, so it covers our whole call flow but not OpenAI itself.
+- Command Center, Tickets, Incidents, Analytics, Settings, Officer and Call pages screenshotted at their target sizes with no console errors.
+
+NOT verified, because no `OPENAI_API_KEY` was available on this machine:
+
+- A real Realtime call (session minting at `/v1/realtime/client_secrets`, the WebRTC handshake with OpenAI, Urdu speech quality, barge-in).
+- The Urdu voice note (`/v1/audio/speech`).
+- AI incident summaries and live field extraction by the text model (the keyword pass and the template summary were verified).
+
+First thing to do once the key is in `.env.local`: restart, open `/call`, make one call. If session minting returns HTTP 400, the server logs the reason and retries with a smaller session config (see `src/app/api/realtime/session/route.ts`).
+
 ## Decisions made
 
-- One Next.js 16 app (App Router, TypeScript, Tailwind v4, shadcn/ui on Base UI), `npm run dev` only.
-- `cacheComponents` is off in `next.config.ts`: every screen is live data.
-- SQLite file `data/faryad.db` via Drizzle + better-sqlite3. Tables are created from `SCHEMA_SQL` in `src/db/schema.ts` on first open, and the demo data is auto-seeded when the DB is empty. If the schema changes, delete `data/faryad.db*`.
-- "Cantt" and "Peshawar Cantonment" are one area (aliases), so the seed has 24 areas.
-- Live updates: in-process bus (`src/server/bus.ts`) behind `GET /api/stream` (SSE).
-- Voice: browser <-> OpenAI Realtime over WebRTC with an ephemeral secret from `POST /api/realtime/session` (`/v1/realtime/client_secrets` then `/v1/realtime/calls`). Tools run in the browser against our REST API.
-- Live "extracted details" on the Command Center come from the server: keyword pass first, then a small text model, so the voice loop is never slowed down.
+- One Next.js 16 app (App Router, TypeScript, Tailwind v4, shadcn/ui on Base UI). `cacheComponents` is off: every screen is live data.
+- SQLite `data/faryad.db` via Drizzle + better-sqlite3. Tables come from `SCHEMA_SQL` in `src/db/schema.ts`; demo data auto-seeds when the DB is empty. If the schema changes, delete `data/faryad.db*`.
+- "Cantt" and "Peshawar Cantonment" are one area (aliases): 24 areas.
+- The two seeded Gulbahar "no water" tickets are 14 and 5 minutes old at reset, so the 2-hour incident window stays open about 1 h 45 min after a reset.
+- Live updates: in-process bus (`src/server/bus.ts`). SSE at `/api/stream`; long-poll at `/api/events` because Cloudflare quick tunnels buffer SSE (measured: zero bytes in 40 s). The browser picks automatically (`src/lib/store.ts`).
+- Demo must run the production build (`npm run demo`). In dev mode the phone page took 164 s to become interactive through the tunnel on a slow uplink; in production 3-14 s.
+- Voice: browser <-> OpenAI Realtime over WebRTC with an ephemeral secret. Tools run in the browser against our REST API.
+- Live "extracted details" come from the server (keyword pass, then a small text model), so the voice loop is never slowed.
 - Voice notes are saved in `public/audio/` and served through `/api/audio/[file]`.
-- `POST /api/demo/simulate` plays a scripted call through the real pipeline (stage fallback).
-- Cost meter prices and the "foreign platform" comparison live in `src/config/pricing.ts`. The comparison figure is an assumption, not a quote.
+- Map: OpenStreetMap raster tiles darkened in the MapLibre style (CARTO's dark tiles now need an API key). Tiles go through the caching proxy `/api/tiles` into `data/tiles/` (978 tiles for zoom 9-15 are cached on this machine).
+- MapLibre v6 worker is copied to `public/maplibre/` by `scripts/copy-map-worker.mjs` (runs before dev and build).
+- Urdu font: the stack uses the real Inter and Noto Nastaliq Urdu faces only. next/font's "Inter Fallback" is local Arial, which has Arabic glyphs and was hijacking Urdu text.
+- `public base URL` is a runtime setting (Settings page, or `npm run tunnel` sets it), not only an env var.
+- Cost meter config is in `src/config/pricing.ts`. `USD_TO_PKR = 280` and `FOREIGN_PLATFORM_USD_PER_MIN = 0.35` are assumptions to be replaced with defensible numbers.
+- cloudflared: winget failed on this network, so the binary sits in `tools/cloudflared.exe` (git-ignored); `npm run tunnel` finds it there.
 
-## Milestones
+## Gotchas met
 
-- [x] 1a. Scaffold, deps, design tokens, DB schema + seed
-- [x] 2a. Server logic + all API routes (type-check clean)
-- [ ] 1b. Layout shell + Command Center (map, pins, feed, counters)
-- [ ] 2b. SSE wired into the Command Center (live pin drop)
-- [ ] 3. /call page with Realtime voice (needs OPENAI_API_KEY in .env.local)
-- [ ] 4. Officer app + resolve -> Urdu voice note on citizen page
-- [ ] 5. GPS share, incident clustering UI, cost meter, human-needed alert
-- [ ] 6. Tickets page + drawer + mark place, Incidents, Settings
-- [ ] 7. Analytics + polish pass
-- [ ] README + demo-day checklist
-
-## Open items
-
-- OPENAI_API_KEY is not set on this machine yet, so the voice call, TTS and AI summaries are untested against the real API.
-- cloudflared is not installed yet.
+- Turbopack sometimes missed a rewrite of `globals.css` on Windows; touching the file again fixed it.
+- Headless Chrome's `--virtual-time-budget` hangs on pages with an open SSE connection; use `scripts/shot.mjs` (Playwright, installed Chrome).
+- Node's own `fetch` to `*.trycloudflare.com` timed out connecting on this network while curl and Chrome worked.

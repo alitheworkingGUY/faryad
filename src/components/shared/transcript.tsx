@@ -34,8 +34,19 @@ export function TranscriptBubbles({
   const endRef = useRef<HTMLDivElement>(null);
   const last = lines[lines.length - 1];
 
+  // Follow the conversation by scrolling the nearest scrollable box only. scrollIntoView
+  // would also scroll the page, which on a phone pushes the call controls off screen.
   useEffect(() => {
-    if (autoScroll) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (!autoScroll) return;
+    let box = endRef.current?.parentElement ?? null;
+    while (box && box !== document.body) {
+      const overflow = getComputedStyle(box).overflowY;
+      if ((overflow === "auto" || overflow === "scroll") && box.scrollHeight > box.clientHeight) {
+        box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+        return;
+      }
+      box = box.parentElement;
+    }
   }, [autoScroll, lines.length, last?.text]);
 
   const text = size === "lg" ? "text-lg" : size === "sm" ? "text-sm" : "text-[15px]";

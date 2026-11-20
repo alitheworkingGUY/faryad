@@ -210,7 +210,16 @@ export function CallScreen() {
   const statusTicket = ticket ?? saved;
 
   return (
-    <div dir="rtl" lang="ur" className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-ink px-5 pt-5 pb-7">
+    <div
+      dir="rtl"
+      lang="ur"
+      className={cn(
+        "mx-auto flex w-full max-w-md flex-col bg-ink px-5 pt-5 pb-7",
+        // During a call the screen is exactly one viewport tall: captions scroll inside
+        // their box and the End call button never leaves the screen.
+        view === "call" ? "h-dvh overflow-hidden" : "min-h-dvh",
+      )}
+    >
       <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
       <header className="flex items-center justify-between" dir="ltr">
@@ -332,7 +341,7 @@ export function CallScreen() {
               </div>
             )}
 
-            <div className="scroll-thin mt-3 min-h-24 w-full flex-1 overflow-y-auto rounded-3xl border border-line bg-panel/60 p-3">
+            <div className="scroll-thin mt-3 min-h-20 w-full flex-1 overflow-y-auto rounded-3xl border border-line bg-panel/60 p-3">
               <TranscriptBubbles lines={call.lines} size="lg" emptyLabel="گفتگو یہاں نظر آئے گی" />
             </div>
 

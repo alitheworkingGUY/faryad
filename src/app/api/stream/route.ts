@@ -36,7 +36,9 @@ export async function GET(req: Request) {
       };
       req.signal.addEventListener("abort", cleanup);
       send("retry: 1500\n\n");
-      send(": connected\n\n");
+      // First real message: the browser treats its arrival as proof that this
+      // connection streams. If it never comes, the browser switches to /api/events.
+      send(`data: ${JSON.stringify({ type: "hello", ts: Date.now() })}\n\n`);
     },
     cancel() {
       cleanup();

@@ -7,7 +7,7 @@ A citizen scans a QR code, speaks their complaint in Urdu or English from the ph
 | Screen | Path | For |
 | --- | --- | --- |
 | Command Center | `/` | Projector / desk. Live map, live call panel, ticket feed, counters |
-| Citizen call page | `/call` | Phone. Urdu-first voice call, ticket card, live status, voice note |
+| Citizen call page | `/call` | Phone. Urdu-first voice call, ticket card, live status, voice note |out
 | Officer app | `/officer` | Phone. Department queue, Assign → Start → Resolve |
 | Tickets | `/tickets` | Search, filter, sort; ticket drawer with transcript, timeline, mark place |
 | Incidents | `/incidents` | Clusters of similar complaints, AI summary, escalation level |
@@ -26,6 +26,8 @@ npm run dev                    # http://localhost:3000
 
 The database (`data/faryad.db`) is created and seeded automatically on first run.
 
+**For the live demo, run the production build instead: `npm run demo`** (it runs `npm run build` then `npm start`, same port). `npm run dev` is for working on the code. Development bundles are many times larger, and through the tunnel on a slow uplink the phone page took over two minutes to become usable in dev mode, against a few seconds in production.
+
 ### Environment variables (`.env.local`)
 
 | Variable | Default | Purpose |
@@ -40,13 +42,15 @@ The database (`data/faryad.db`) is created and seeded automatically on first run
 | `OPENAI_TEXT_MODEL` | `gpt-4o-mini` | Live field extraction and incident summaries |
 | `PUBLIC_BASE_URL` | none | Public https address used in QR codes. Optional: `npm run tunnel` sets it at runtime |
 
-Restart `npm run dev` after changing `.env.local`.
+Restart the server after changing `.env.local`.
 
 ### Scripts
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the app on port 3000 |
+| `npm run dev` | Start the app on port 3000 in development mode |
+| `npm run demo` | Build and start the production server on port 3000. Use this on stage |
+| `npm run test:call` | End-to-end check of the call page with a stand-in for OpenAI (no credit used). Needs the app running; pass the tunnel URL as an argument to test through it |
 | `npm run seed` | Wipe tickets, calls and incidents and load the demo dataset (use Settings → Reset demo data while the app is running) |
 | `npm run tunnel` | Start `cloudflared` and tell the app its public URL, so QR codes work on phones |
 | `npm run tiles` | Cache the Peshawar map tiles locally (needs the app running). Do this once on good internet |
@@ -58,10 +62,10 @@ Restart `npm run dev` after changing `.env.local`.
 Phones need https for the microphone, so the app is exposed through a Cloudflare quick tunnel.
 
 ```bash
-winget install Cloudflare.cloudflared      # once
+winget install Cloudflare.cloudflared      # once (or put cloudflared.exe in ./tools/)
 
 # terminal 1
-npm run dev
+npm run demo
 # terminal 2
 npm run tunnel
 ```
@@ -70,18 +74,20 @@ npm run tunnel
 
 Keep the Command Center on `http://localhost:3000` on the projector laptop (fastest). Phones use the tunnel address from the QR code.
 
+Cloudflare quick tunnels hold back Server-Sent Events, so a page opened through the tunnel gets its live updates by long-polling `/api/events` instead. This is automatic. Measured through the tunnel: the citizen's phone showed "Resolved" about 150 ms after the officer's update.
+
 ## Demo-day checklist
 
 The evening before:
 
 1. Put `OPENAI_API_KEY` in `.env.local`. Confirm the account has credit.
-2. `npm run dev`, then `npm run tiles` once so the map loads from disk.
+2. `npm run demo`, then `npm run tiles` once so the map loads from disk.
 3. `npm run tunnel`, scan the QR with an Android phone and complete one full Urdu call. Check the pin drops and the ticket number is read out.
 4. Open `/officer` on a second phone, resolve that ticket and confirm the first phone plays the voice note.
 
 On the day, about 30 minutes before you present:
 
-1. Connect the laptop to the venue network, then start `npm run dev` and `npm run tunnel` (the tunnel address is new every time).
+1. Connect the laptop to the venue network, then start `npm run demo` and `npm run tunnel` (the tunnel address is new every time).
 2. Open `http://localhost:3000` in Chrome on the projector and press **F** for fullscreen. Check the top bar shows **AI Agent Online** in green.
 3. Settings → **Reset demo data**. This matters: the dataset has two open "no water" reports in Gulbahar, and the third call raises an incident only while those two are under two hours old. A reset gives you about 1 h 45 min.
 4. Open `/officer` on the officer phone and pick **WSSP**.
@@ -97,7 +103,7 @@ Command Center keys: **F** fullscreen · **M** heatmap · **R** show/hide resolv
 
 - **One Next.js app** (App Router, TypeScript, Tailwind v4, shadcn/ui, Framer Motion). No other services to run.
 - **Data**: SQLite at `data/faryad.db` through Drizzle ORM. Schema in `src/db/schema.ts`, demo data in `src/db/seed-data.ts`.
-- **Live updates**: `GET /api/stream` is a Server-Sent Events stream. Every screen holds one connection; the server broadcasts `call.*`, `ticket.*`, `incident.*`, `citizen.notify` and `settings.updated` events.
+- **Live updates**: `GET /api/stream` is a Server-Sent Events stream. Every screen holds one connection; the server broadcasts `call.*`, `ticket.*`, `incident.*`, `citizen.notify` and `settings.updated` events. `GET /api/events` serves the same events by long-polling for connections that buffer SSE; the browser switches to it by itself if the stream's first message does not arrive within four seconds.
 - **Voice**: the browser opens a WebRTC call straight to the OpenAI Realtime API using a short-lived client secret from `POST /api/realtime/session`. The agent's tools (`create_ticket`, `get_ticket_status`, `set_location_from_gps`, `transfer_to_human`) run in the browser against our REST API. Captions and usage are posted to `/api/calls/{id}/events` so the Command Center shows the call live. Speaking over the agent interrupts it (server VAD, 500 ms silence).
 - **Extracted details** on the Command Center come from the server: a keyword pass on each caller line, then a small text model, so the voice loop is never slowed.
 - **Business rules** (`src/server/`): department and SLA by category, priority from category + caller mood, incident clustering (3+ open tickets, same category and area, within 2 hours; escalation = min(3, floor(count / 3))).
@@ -114,6 +120,7 @@ GET  /api/tickets/status?ticketNo=|phone=
 GET  /api/incidents          GET /api/areas[?lat=&lng=]            GET /api/departments
 POST /api/calls              POST /api/calls/{id}/events           PATCH /api/calls/{id}
 GET  /api/analytics/summary  GET /api/stream (SSE)                 GET /api/bootstrap
+GET  /api/events (long-poll twin of /api/stream)
 GET|PUT /api/settings        POST /api/demo/reset                  POST /api/demo/simulate
 ```
 
@@ -144,3 +151,5 @@ curl -X POST http://localhost:3000/api/tickets -H "Content-Type: application/jso
 | QR code points at localhost | Run `npm run tunnel` or set Settings → Public URL |
 | Third Gulbahar call raises no incident | The seeded tickets are older than two hours. Reset demo data |
 | Map has dark gaps | Tiles were unreachable. Run `npm run tiles` on a good connection |
+| The app starts on port 3001 | Something is still using port 3000 (often an earlier server). Close it; the tunnel and QR codes expect 3000 |
+| Phone page is very slow to open | You are running `npm run dev`. Use `npm run demo` |

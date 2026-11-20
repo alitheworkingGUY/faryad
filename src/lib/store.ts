@@ -238,35 +238,107 @@ export const useLive = create<LiveState>((set, get) => ({
   },
 }));
 
-// ---------- one shared SSE connection per tab ----------
+// ---------- one shared live connection per tab ----------
+//
+// Server-Sent Events first. Some proxies hold SSE back until the response ends
+// (Cloudflare quick tunnels do), so if the stream's hello has not arrived within a
+// few seconds the tab switches to long-polling /api/events instead.
 
 type Listener = (event: LiveEvent) => void;
 const listeners = new Set<Listener>();
-let source: EventSource | null = null;
-let everConnected = false;
+let started = false;
+let polling = false;
+const SSE_PROBE_MS = 4000;
 
-function connect() {
-  if (source || typeof window === "undefined") return;
-  source = new EventSource("/api/stream");
-  source.onopen = () => {
-    useLive.setState({ connected: true });
-    // After a dropped connection, reload to pick up anything that was missed.
-    if (everConnected) void useLive.getState().load();
-    everConnected = true;
-  };
-  source.onerror = () => {
-    useLive.setState({ connected: false });
-  };
-  source.onmessage = (msg) => {
-    let event: LiveEvent;
+function dispatch(event: LiveEvent) {
+  useLive.getState().apply(event);
+  listeners.forEach((l) => l(event));
+}
+
+function startStream() {
+  let alive = false;
+  let everAlive = false;
+  const es = new EventSource("/api/stream");
+
+  const probe = setTimeout(() => {
+    if (alive || polling) return;
+    es.close();
     try {
-      event = JSON.parse(msg.data) as LiveEvent;
+      window.sessionStorage.setItem(TRANSPORT_KEY, "poll");
+    } catch {
+      // remembered only when storage is available
+    }
+    void startPolling();
+  }, SSE_PROBE_MS);
+
+  es.onmessage = (msg) => {
+    let event: LiveEvent | { type: "hello" };
+    try {
+      event = JSON.parse(msg.data);
     } catch {
       return;
     }
-    useLive.getState().apply(event);
-    listeners.forEach((l) => l(event));
+    if (event.type === "hello") {
+      clearTimeout(probe);
+      alive = true;
+      useLive.setState({ connected: true });
+      // After a dropped connection, reload to pick up anything that was missed.
+      if (everAlive) void useLive.getState().load();
+      everAlive = true;
+      return;
+    }
+    dispatch(event);
   };
+  es.onerror = () => {
+    alive = false;
+    if (!polling) useLive.setState({ connected: false });
+  };
+}
+
+async function startPolling() {
+  if (polling) return;
+  polling = true;
+  let epoch: string | null = null;
+  let since: number | null = null;
+  let failures = 0;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  for (;;) {
+    try {
+      const query: string = since == null ? "" : `?since=${since}&epoch=${encodeURIComponent(epoch ?? "")}`;
+      const res = await fetch(`/api/events${query}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`events ${res.status}`);
+      const data = (await res.json()) as { epoch: string; seq: number; events: LiveEvent[]; reset: boolean };
+      const first = since == null;
+      epoch = data.epoch;
+      since = data.seq;
+      failures = 0;
+      useLive.setState({ connected: true });
+      // Starting out, or after losing our place: fetch the current state once.
+      if ((first || data.reset) && useLive.getState().loaded) void useLive.getState().load();
+      for (const event of data.events) dispatch(event);
+    } catch {
+      useLive.setState({ connected: false });
+      failures++;
+      await sleep(Math.min(5000, 400 * 2 ** failures));
+    }
+  }
+}
+
+const TRANSPORT_KEY = "faryad.transport";
+
+function connect() {
+  if (started || typeof window === "undefined") return;
+  started = true;
+  // Known-buffering connections skip the SSE probe and go straight to long-polling.
+  let preferPolling = window.location.hostname.endsWith(".trycloudflare.com");
+  try {
+    preferPolling ||= window.sessionStorage.getItem(TRANSPORT_KEY) === "poll";
+  } catch {
+    // sessionStorage unavailable
+  }
+  if (preferPolling) void startPolling();
+  else startStream();
 }
 
 /** Subscribe to raw live events (toasts, the citizen page, the officer app). */
