@@ -29,7 +29,8 @@ function start(command) {
     const text = chunk.toString();
     process.stdout.write(text);
     if (announced) return;
-    const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
+    // The tunnel's own address, not api.trycloudflare.com (which appears in error messages).
+    const match = text.match(/https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/i);
     if (!match) return;
     announced = true;
     const url = match[0];
@@ -61,9 +62,28 @@ function start(command) {
     process.exit(1);
   });
   child.on("exit", (code) => {
-    if (code !== null) process.exit(code);
+    if (stopping) process.exit(0);
+    // Cloudflare sometimes times out handing out a tunnel, and a tunnel can drop on a
+    // weak network. Either way, ask for a new one rather than leaving the QR codes dead.
+    attempts++;
+    if (!announced && attempts >= MAX_ATTEMPTS) {
+      console.error(`\nCloudflare did not give us a tunnel after ${MAX_ATTEMPTS} tries. Check the internet connection and run this again.\n`);
+      process.exit(code ?? 1);
+    }
+    if (announced) attempts = 0;
+    console.log(`\n  Tunnel ${announced ? "closed" : "request failed"}; trying again in 3 seconds...\n`);
+    setTimeout(() => start(command), 3000);
   });
-  process.on("SIGINT", () => child.kill());
+  current = child;
 }
+
+const MAX_ATTEMPTS = 20;
+let attempts = 0;
+let stopping = false;
+let current = null;
+process.on("SIGINT", () => {
+  stopping = true;
+  current?.kill();
+});
 
 start(bin);
