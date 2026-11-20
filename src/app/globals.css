@@ -1,0 +1,237 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter-face), var(--font-nastaliq), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-inter-face), var(--font-nastaliq), ui-sans-serif, system-ui, sans-serif;
+  --font-urdu: var(--font-inter-face), var(--font-nastaliq), "Noto Nastaliq Urdu", serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Faryad mission-control palette */
+  --color-ink: #0b1220;
+  --color-panel: #111a2e;
+  --color-panel-2: #16213a;
+  --color-line: #1f2a44;
+  --color-fg: #e5e7eb;
+  --color-dim: #94a3b8;
+  --color-live: #10b981;
+  --color-warn: #f59e0b;
+  --color-danger: #ef4444;
+  --color-cat-water: #38bdf8;
+  --color-cat-sewerage: #a78bfa;
+  --color-cat-garbage: #f97316;
+  --color-cat-streetlight: #facc15;
+  --color-cat-road: #94a3b8;
+  --color-cat-electricity: #f43f5e;
+}
+
+/* The product is dark-only: same tokens whether or not `.dark` is present. */
+:root,
+.dark {
+  --background: #0b1220;
+  --foreground: #e5e7eb;
+  --card: #111a2e;
+  --card-foreground: #e5e7eb;
+  --popover: #111a2e;
+  --popover-foreground: #e5e7eb;
+  --primary: #10b981;
+  --primary-foreground: #04130d;
+  --secondary: #16213a;
+  --secondary-foreground: #e5e7eb;
+  --muted: #16213a;
+  --muted-foreground: #94a3b8;
+  --accent: #1a2742;
+  --accent-foreground: #e5e7eb;
+  --destructive: #ef4444;
+  --border: #1f2a44;
+  --input: #1f2a44;
+  --ring: #10b981;
+  --chart-1: #38bdf8;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #a78bfa;
+  --chart-5: #f43f5e;
+  --radius: 0.75rem;
+  --sidebar: #0d1526;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #04130d;
+  --sidebar-accent: #16213a;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #1f2a44;
+  --sidebar-ring: #10b981;
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    background: #0b1220;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: rgb(16 185 129 / 0.35);
+  }
+}
+
+/* Urdu text: Nastaliq needs generous line height and its own direction. */
+.ur {
+  /* Latin and digits stay in Inter; Arabic-script glyphs fall through to Nastaliq */
+  font-family: var(--font-inter-face), var(--font-nastaliq), "Noto Nastaliq Urdu", serif;
+  line-height: 1.9;
+  direction: rtl;
+  unicode-bidi: isolate;
+  font-feature-settings: normal;
+}
+.ur-tight {
+  line-height: 1.6;
+}
+html[lang="ur"] body {
+  line-height: 1.9;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin, quiet scrollbars for the dark panels */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3757 transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #2a3757;
+  border-radius: 999px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Subtle grid backdrop used behind empty panels */
+.grid-backdrop {
+  background-image:
+    linear-gradient(rgb(31 42 68 / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(31 42 68 / 0.35) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@keyframes faryad-pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes faryad-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pulse-ring {
+  animation: faryad-pulse-ring 1.8s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+}
+.pulse-ring-slow {
+  animation: faryad-pulse-ring 2.6s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+}
+.blink {
+  animation: faryad-blink 1.6s ease-in-out infinite;
+}
+
+/* MapLibre chrome, restyled for the dark theme */
+.maplibregl-map {
+  font-family: inherit;
+  background: #0b1220;
+}
+.maplibregl-ctrl-attrib {
+  background: rgb(11 18 32 / 0.7) !important;
+  color: #64748b;
+  font-size: 10px;
+  border-radius: 6px 0 0 0;
+}
+.maplibregl-ctrl-attrib a {
+  color: #94a3b8 !important;
+}
+.maplibregl-ctrl-group {
+  background: #111a2e !important;
+  border: 1px solid #1f2a44;
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid #1f2a44 !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(0.85);
+}
+.maplibregl-marker {
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring,
+  .pulse-ring-slow,
+  .blink {
+    animation: none;
+  }
+}
