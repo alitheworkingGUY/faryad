@@ -49,3 +49,10 @@ Still not done by anyone: a call from a physical phone through the tunnel (micro
 - Headless Chrome's `--virtual-time-budget` hangs on pages with an open SSE connection; use `scripts/shot.mjs` (Playwright, installed Chrome).
 - Node's own `fetch` to `*.trycloudflare.com` and to `api.openai.com` intermittently timed out connecting on this network while curl and Chrome worked.
 - On this network, tap-to-live took 9-11 s (session + SDP exchange with OpenAI). Expect 1-3 s on a healthy connection.
+
+## Submission (KP AI Impact Challenge 2026), 21 Nov 2026
+
+- Zip built with `git archive` from `main`: `~/Downloads/faryad-submission/Faryad-MVP.zip` (0.29 MB). Needs renaming to `[Application_Ref]_[Team_Name].zip`.
+- Clean-folder check passed: extract, `npm install`, `npm run build`, run with no API key. First run seeds the database, the scripted call raises the incident, all pages return 200, no console errors.
+- `.npmrc` has `ignore-scripts=true` on purpose. Installing from `package-lock.json` makes npm compile better-sqlite3 from source (npm drops the package's `gypfile: false` when it reads the lockfile), which fails on Windows without Visual Studio build tools. The package ships prebuilt binaries, so no compile is needed. Because pre/post npm hooks are skipped too, the MapLibre worker copy runs inside the `dev` and `build` commands.
+- `scripts/tunnel.mjs` now requests the quick tunnel itself (cloudflared's own request timed out when Cloudflare took ~7 s to answer), publishes the URL only once connected, and replaces a tunnel Cloudflare has deleted. One tunnel lasted 3 h 15 min and died when the laptop's network dropped for about a minute.
