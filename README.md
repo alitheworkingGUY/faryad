@@ -14,6 +14,34 @@ A citizen scans a QR code, speaks their complaint in Urdu or English from the ph
 | Analytics | `/analytics` | Calls per hour, categories, areas, SLA, cost per call |
 | Settings | `/settings` | Agent prompt and voice, public URL + QR codes, demo reset, simulated calls |
 
+## For evaluators: quick start
+
+```bash
+npm install
+cp .env.example .env.local     # add OPENAI_API_KEY (see below)
+npm run dev                    # then open http://localhost:3000
+```
+
+- **Login credentials:** none. The prototype has no login; every screen opens directly.
+- **Database:** created and filled with sample data automatically on first run. No setup.
+- **Without an OpenAI key** the app still runs. Open the Command Center and press **S** (or Settings → Simulated calls): a scripted Urdu call plays through the real pipeline, with live transcript, extracted details, a new ticket, a pin on the map and an incident alert. Tickets, the officer app, incidents and analytics all work.
+- **With an OpenAI key** the voice agent, the Urdu voice note and the AI summaries are live. Open `/call` on the same machine (localhost counts as a secure page) or on a phone through `npm run tunnel`, and speak a complaint.
+- **Suggested path through the demo:** Command Center (`/`) → make or simulate a call → open `/officer`, pick WSSP and resolve the new ticket → watch the citizen page show "Resolved" and play the voice note.
+
+## AI tools, APIs and models used (disclosure)
+
+| Used for | What | Provider |
+| --- | --- | --- |
+| Voice agent (listens, speaks, calls tools) | `gpt-realtime` over the Realtime API (WebRTC) | OpenAI |
+| Transcribing the caller for captions | `gpt-4o-transcribe` | OpenAI |
+| Urdu voice note on resolve | `gpt-4o-mini-tts` | OpenAI |
+| Incident summaries and live field extraction | `gpt-4.1` (configurable) | OpenAI |
+| Map | MapLibre GL with OpenStreetMap tiles | Open source / OSM contributors |
+| App framework and UI | Next.js, React, Tailwind CSS, shadcn/ui, Framer Motion, Recharts, Drizzle ORM, SQLite | Open source |
+| Writing the code | An AI coding assistant (Claude Code) was used to build this prototype, directed and tested by the team | Anthropic |
+
+No custom-trained model is used in this MVP. The AI component is implemented and functional: real speech in, tool calls that create and look up tickets, speech out. Ticketing, routing, SLA, incident clustering and the live dashboard are the project's own code and do not depend on the model provider. The seeded tickets and areas are sample data written for the demo, not a real dataset.
+
 ## Setup
 
 Requires Node.js 20 or newer.
